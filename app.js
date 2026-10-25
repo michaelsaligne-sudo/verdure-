@@ -91,12 +91,15 @@ $("#garden").addEventListener("click", e => {
   if (b.dataset.water) { const p = plants.find(x => x.id === b.dataset.water); savePlant({ ...p, last: todayISO() }); toast("Arrosage noté"); }
   if (b.dataset.task) { const p = plants.find(x => x.id === b.dataset.pid), t = TASKS.find(x => x.k === b.dataset.task); savePlant(t.set(p, todayISO())); toast(t.done + ", c'est noté"); }
   if (b.dataset.edit) openAdd(plants.find(x => x.id === b.dataset.edit));
-  if (b.dataset.info) { show("fiches"); $("#search").value = bySpecies(b.dataset.info).nom; renderCatalog(true); }
+  if (b.dataset.info) { show("fiches"); $("#catFilter").value = ""; $("#search").value = bySpecies(b.dataset.info).nom; renderCatalog(true); }
 });
 
 /* ---------- ajout / édition ---------- */
 let editing = null, pendingPhoto = null, pendingLatin = "";
-$("#fSpecies").innerHTML = CATALOG.map(c => `<option value="${c.id}">${c.nom}${c.latin ? " (" + c.latin + ")" : ""}</option>`).join("");
+const sorted = list => [...list].sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+$("#fSpecies").innerHTML = Object.entries(CATS).map(([k, label]) => `<optgroup label="${label}">` + sorted(CATALOG.filter(c => c.cat === k))
+  .map(c => `<option value="${c.id}">${c.nom}${c.latin ? " (" + c.latin + ")" : ""}</option>`).join("") + `</optgroup>`).join("")
+  + `<option value="autre">Autre plante</option>`;
 $("#fSpecies").onchange = () => { const c = bySpecies($("#fSpecies").value); $("#fEvery").value = c.eau; $("#fMist").value = defMist(c); $("#fFeed").value = defFeed(c); };
 function openAdd(p = {}) {
   editing = p.id ? p : null; pendingPhoto = p.photo || null; pendingLatin = p.latin || "";
@@ -220,20 +223,29 @@ function renderDx() {
   const picked = [...document.querySelectorAll("#symptoms input:checked")].map(i => i.value);
   const p = plants.find(x => x.id === $("#dxPlant").value), c = p ? bySpecies(p.species) : null;
   const ctx = c && c.id !== "autre" ? `<div class="card"><span class="eyebrow">Rappel pour ${esc(plantName(p))}</span><p style="margin:0">Arrosage conseillé tous les ${c.eau} j (vous : ${p.every} j) · lumière ${c.lumiere.toLowerCase()} · humidité ${c.humidite.toLowerCase()}.</p></div>` : "";
-  $("#dxOut").innerHTML = picked.length ? ctx + picked.map(s => `<details open><summary>${esc(s)}</summary><p>${OFFLINE[s]}</p></details>`).join("")
-    : `<p class="note">Cochez un ou plusieurs symptômes pour voir les causes probables et quoi faire.</p>`;
+  if (!picked.length) { $("#dxOut").innerHTML = `<p class="note">Cochez un ou plusieurs symptômes pour voir les causes probables et quoi faire.</p>`; return; }
+  // Classement : symptômes qui correspondent, puis bonus si le problème touche souvent ce type de plante.
+  const ranked = PROBLEMS.map(pb => {
+    const hits = pb.sym.filter(x => picked.includes(x));
+    const fits = c && c.id !== "autre" && (pb.pour.includes(c.id) || pb.pour.includes(c.cat));
+    return { pb, hits, score: hits.length / Math.sqrt(pb.sym.length) + (hits.length && fits ? (pb.pour.includes(c.id) ? .5 : .25) : 0) };
+  }).filter(r => r.hits.length).sort((x, y) => y.score - x.score).slice(0, 4);
+  $("#dxOut").innerHTML = ctx + `<p class="note">Causes les plus probables${c && c.id !== "autre" ? " pour " + esc(c.nom.toLowerCase()) : ""} :</p>` + ranked.map((r, i) => `<details ${i === 0 ? "open" : ""}><summary>${esc(r.pb.nom)} <span class="pill">${r.pb.type}</span></summary>
+    <p class="note">Correspond à : ${r.hits.map(esc).join(", ").toLowerCase()}</p><p><b>Pourquoi.</b> ${r.pb.cause}</p><p><b>Que faire.</b> ${r.pb.faire}</p><p><b>À l'avenir.</b> ${r.pb.prevenir}</p></details>`).join("");
 }
 $("#symptoms").onchange = renderDx; $("#dxPlant").onchange = renderDx;
 
 /* ---------- fiches et lumière ---------- */
 function renderCatalog(openFirst) {
   const q = $("#search").value.trim().toLowerCase();
-  const list = CATALOG.filter(c => c.id !== "autre" && (!q || (c.nom + " " + c.latin).toLowerCase().includes(q)));
+  const f = $("#catFilter").value;
+  const list = sorted(CATALOG.filter(c => c.id !== "autre" && (!f || c.cat === f) && (!q || (c.nom + " " + c.latin + " " + CATS[c.cat]).toLowerCase().includes(q))));
   $("#catalog").innerHTML = list.length ? list.map((c, i) => `<details ${openFirst && i === 0 ? "open" : ""}><summary>${c.nom} <span style="font-weight:400;font-style:italic;color:var(--muted)">${c.latin}</span></summary>
     <div class="facts" style="margin-top:10px"><div class="fact"><b>Arrosage</b>tous les ${c.eau} j environ</div><div class="fact"><b>Lumière</b>${c.lumiere}</div><div class="fact"><b>Humidité</b>${c.humidite}</div><div class="fact"><b>Température</b>${c.temp}</div><div class="fact"><b>Engrais</b>${c.engrais}</div><div class="fact"><b>Animaux</b>${c.toxique ? "Toxique" : "Sans danger connu"}</div></div>
     <p>${c.conseil}</p><button class="small" data-add="${c.id}">Ajouter à mon jardin</button></details>`).join("") : `<p class="note">Aucune fiche. Essayez l'onglet Identifier avec une photo.</p>`;
 }
-$("#search").oninput = () => renderCatalog(false);
+$("#catFilter").innerHTML = `<option value="">Toutes (${CATALOG.length - 1})</option>` + Object.entries(CATS).map(([k, l]) => `<option value="${k}">${l} (${CATALOG.filter(c => c.cat === k).length})</option>`).join("");
+$("#search").oninput = () => renderCatalog(false); $("#catFilter").onchange = () => renderCatalog(false);
 $("#catalog").addEventListener("click", e => { const b = e.target.closest("[data-add]"); if (b) { show("jardin"); openAdd({ species: b.dataset.add }); } });
 function renderLight() {
   const lvl = Math.max(0, Math.min(3, +$("#lOrient").value - +$("#lDist").value)), L = LIGHT[lvl];

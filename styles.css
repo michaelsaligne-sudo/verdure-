@@ -74,3 +74,4 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .wrap header{padding-top:4px}
 .card p,.today p{margin:0}
 section > p{margin:0}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:middle}
