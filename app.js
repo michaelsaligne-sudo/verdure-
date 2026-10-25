@@ -362,17 +362,21 @@ Méthode : 1) décris précisément ce qui est visible (partie de la plante, cou
 Base de problèmes connus (id : nom) : ${PROBLEMS.map(x => `${x.id} : ${x.nom}`).join(" ; ")}.
 Contexte : ${JSON.stringify(dxContext(p, c))}`;
   const contents = [{ parts: [{ inline_data: { mime_type: "image/jpeg", data: b64 } }, { text: prompt }] }];
-  let r = await geminiCall(key, { contents, generationConfig: { responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: DX_SCHEMA } } } });
+  let r = await geminiCall(key, { contents, generationConfig: { maxOutputTokens: 8192, responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: DX_SCHEMA } } } });
   if (r.status === 400) {
     const err = await r.clone().json().catch(() => ({}));
-    if (!/API key|API_KEY/i.test(JSON.stringify(err))) r = await geminiCall(key, { contents, generationConfig: { responseMimeType: "application/json", responseJsonSchema: DX_SCHEMA } });
+    if (!/API key|API_KEY/i.test(JSON.stringify(err))) r = await geminiCall(key, { contents, generationConfig: { maxOutputTokens: 8192, responseMimeType: "application/json", responseJsonSchema: DX_SCHEMA } });
   }
   if (!r.ok) {
     const err = await r.json().catch(() => ({})), msg = err.error?.message || "";
     const e = new Error(msg); e.status = r.status; throw e;
   }
-  const j = await r.json(), txt = (j.candidates?.[0]?.content?.parts || []).map(x => x.text || "").join("");
-  return JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+  const j = await r.json(), cand = j.candidates?.[0];
+  const txt = (cand?.content?.parts || []).filter(x => !x.thought).map(x => x.text || "").join("");
+  const a = txt.indexOf("{"), b = txt.lastIndexOf("}");
+  if (a < 0 || b < a) { const e = new Error(`réponse vide (${cand?.finishReason || j.promptFeedback?.blockReason || "sans motif"})`); e.parse = true; throw e; }
+  try { return JSON.parse(txt.slice(a, b + 1)); }
+  catch { const e = new Error(`réponse incomplète (${cand?.finishReason || "illisible"})`); e.parse = true; throw e; }
 }
 const certLabel = n => n >= 75 ? "très probable" : n >= 50 ? "probable" : n >= 25 ? "possible" : "peu probable";
 function renderAi(res, c) {
@@ -418,9 +422,15 @@ $("#dxGo").onclick = async () => {
   $("#dxGo").disabled = true; out.innerHTML = `<p class="note">Analyse de la photo${gm ? " par un expert virtuel, environ 10 secondes" : ""}…</p>`;
   try {
     if (place()) await loadWeather();
-    if (gm) renderAi(await aiDiagnose(gm, p, c), c); else await plantnetDiagnose(pn);
+    if (gm) {
+      let res;
+      try { res = await aiDiagnose(gm, p, c); }
+      catch (e) { if (!e.status && !e.parse) e.message = "connexion à Gemini impossible : " + e.message; throw e; }
+      renderAi(res, c);
+    } else await plantnetDiagnose(pn);
   } catch (e) {
     const s = e.status;
+    if (!s) { out.innerHTML = `<p class="note">L'analyse n'a pas abouti : ${esc(e.message || String(e))}. Réessayez ; si ça recommence, envoyez-moi une capture de ce message.</p>`; return; }
     out.innerHTML = `<p class="note">${s === 400 || s === 401 || s === 403 ? `Google refuse la clé Gemini (code ${s}). Vérifiez-la dans Réglages.` : s === 429 ? "Quota gratuit Gemini atteint pour le moment. Réessayez dans une minute, ou demain." : s ? `Gemini ne répond pas (code ${s}${e.message ? " : " + esc(e.message.slice(0, 120)) : ""}). Réessayez.` : "Pas de réponse. Vérifiez votre connexion et réessayez."}</p>`;
   } finally { $("#dxGo").disabled = false; }
 };
