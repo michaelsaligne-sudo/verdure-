@@ -186,7 +186,35 @@ $("#idGo").onclick = async () => {
   } finally { $("#idGo").disabled = false; }
 };
 
-/* ---------- diagnostic ---------- */
+/* ---------- diagnostic par photo (Pl@ntNet, maladies et ravageurs) ---------- */
+let dxImg = null;
+picker($("#dxDrop"), $("#dxFile"), r => { dxImg = r; $("#dxGo").disabled = false; });
+$("#dxGo").onclick = async () => {
+  const out = $("#dxPhotoOut"), key = store.get("verdure.plantnetKey", "");
+  if (!key) { out.innerHTML = `<p class="note">Ajoutez d'abord votre clé Pl@ntNet gratuite dans l'onglet Réglages.</p>`; return; }
+  $("#dxGo").disabled = true; out.innerHTML = `<p class="note">Analyse de la photo…</p>`;
+  const fd = new FormData(); fd.append("images", dxImg.blob, "photo.jpg");
+  try {
+    const r = await fetch(`https://my-api.plantnet.org/v2/diseases/identify?api-key=${encodeURIComponent(key)}&lang=fr&nb-results=3&include-related-images=true`, { method: "POST", body: fd });
+    if (r.status === 404) { out.innerHTML = `<p class="note">Aucune maladie ni ravageur reconnu sur cette photo. Si la plante va mal, cochez les symptômes ci-dessous.</p>`; return; }
+    if (r.status === 401 || r.status === 403) { out.innerHTML = `<p class="note">Pl@ntNet refuse la clé. Vérifiez-la dans Réglages.</p>`; return; }
+    if (r.status === 429) { out.innerHTML = `<p class="note">Quota Pl@ntNet du jour atteint. Réessayez demain.</p>`; return; }
+    if (!r.ok) throw new Error(r.status);
+    const res = ((await r.json()).results || []).filter(x => x.score >= .05);
+    if (!res.length) { out.innerHTML = `<p class="note">Rien de net sur cette photo. Essayez plus près de la zone abîmée, ou cochez les symptômes ci-dessous.</p>`; return; }
+    out.innerHTML = res.map((x, i) => {
+      const img = x.images?.[0]?.url?.s;
+      return `<div class="plant" style="grid-template-columns:${img ? "72px 1fr" : "1fr"}">
+        ${img ? `<img class="thumb" src="${esc(img)}" alt="Exemple de référence" loading="lazy">` : ""}
+        <div class="meta"><span class="eyebrow">${i === 0 ? "Le plus probable" : "Autre possibilité"} · ${Math.round(x.score * 100)} %</span><h3>${esc(x.description || x.name)}</h3>
+        ${img ? `<span class="note">Photo de référence : comparez avec votre plante.</span>` : ""}</div></div>`;
+    }).join("") + `<p class="note">${res[0].score < .4 ? "Résultat incertain. " : ""}Ce modèle connaît surtout les maladies des plantes cultivées (potager, verger, vigne). Pour une plante d'intérieur, complétez avec les symptômes ci-dessous.</p>`;
+  } catch {
+    out.innerHTML = `<p class="note">Pas de réponse de Pl@ntNet. Vérifiez votre connexion et réessayez.</p>`;
+  } finally { $("#dxGo").disabled = false; }
+};
+
+/* ---------- diagnostic par symptômes ---------- */
 $("#symptoms").innerHTML = SYMPTOMS.map((s, i) => `<label><input type="checkbox" id="sy${i}" value="${s}">${s}</label>`).join("");
 function renderDx() {
   const picked = [...document.querySelectorAll("#symptoms input:checked")].map(i => i.value);

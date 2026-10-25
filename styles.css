@@ -73,3 +73,4 @@ dialog::backdrop{background:rgba(10,20,14,.45)}
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .wrap header{padding-top:4px}
 .card p,.today p{margin:0}
+section > p{margin:0}

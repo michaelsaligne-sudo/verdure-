@@ -54,6 +54,15 @@
   <!-- DIAGNOSTIC -->
   <section id="v-diagnostic" hidden>
     <h2>Diagnostic</h2>
+    <div class="card">
+      <h3>Par photo</h3>
+      <p class="note">Photographiez de près la partie abîmée (feuille tachée, insectes, moisissure). Analyse par Pl@ntNet.</p>
+      <div class="drop" id="dxDrop" tabindex="0"><span>Toucher pour prendre ou choisir une photo</span></div>
+      <input type="file" id="dxFile" accept="image/*" hidden>
+      <button class="primary" id="dxGo" disabled>Analyser la photo</button>
+      <div id="dxPhotoOut" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+    <h3>Par symptômes</h3>
     <p class="note">Cochez ce que vous voyez sur la plante.</p>
     <div class="sym" id="symptoms"></div>
     <label>Plante concernée<select id="dxPlant"></select></label>
