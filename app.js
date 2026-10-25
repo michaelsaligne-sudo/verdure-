@@ -157,7 +157,10 @@ $("#idGo").onclick = async () => {
   try {
     const r = await fetch(`${PLANTNET_API}?api-key=${encodeURIComponent(key)}&lang=fr&nb-results=4`, { method: "POST", body: fd });
     if (r.status === 404) { out.innerHTML = `<div class="card"><h3>Aucune plante reconnue</h3><p class="note">Essayez une photo plus proche d'une feuille ou d'une fleur, sur fond simple.</p></div>`; return; }
-    if (r.status === 401 || r.status === 403) { out.innerHTML = `<p class="note">Pl@ntNet refuse la clé. Vérifiez-la dans Réglages, et que ${esc(location.hostname)} figure dans les domaines autorisés de votre compte Pl@ntNet.</p>`; return; }
+    if (r.status === 401 || r.status === 403) {
+      const why = await r.json().then(j => j.message || j.error || "").catch(() => "");
+      out.innerHTML = `<p class="note">Pl@ntNet refuse la clé (code ${r.status}${why ? " : " + esc(why) : ""}). Vérifiez-la dans Réglages, et que ${esc(location.hostname)} figure dans les domaines autorisés de votre compte Pl@ntNet.</p>`; return;
+    }
     if (r.status === 429) { out.innerHTML = `<p class="note">Quota Pl@ntNet du jour atteint. Réessayez demain.</p>`; return; }
     if (!r.ok) throw new Error(r.status);
     const data = await r.json(), best = data.results?.[0];
@@ -266,7 +269,7 @@ $("#notifTest").onclick = async () => {
 /* ---------- réglages : clé Pl@ntNet, sauvegarde ---------- */
 $("#siteHost").textContent = location.hostname;
 $("#pnKey").value = store.get("verdure.plantnetKey", "");
-$("#pnSave").onclick = () => { store.set("verdure.plantnetKey", $("#pnKey").value.trim()); toast("Clé enregistrée sur ce téléphone"); };
+$("#pnSave").onclick = () => { const k = $("#pnKey").value.replace(/[\s"'«»]/g, ""); $("#pnKey").value = k; store.set("verdure.plantnetKey", k); toast("Clé enregistrée sur ce téléphone"); };
 $("#backupOut").onclick = () => {
   const blob = new Blob([JSON.stringify({ app: "verdure", version: 1, saved: new Date().toISOString(), plants }, null, 1)], { type: "application/json" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `verdure-${todayISO()}.json`; a.click();
