@@ -6,6 +6,8 @@
      POST /send                                  tâche planifiée quotidienne (en-tête x-cron-secret)
      POST /identify     formulaire { key, organs, images }  relaie une identification vers Pl@ntNet
                         (Pl@ntNet refuse les appels directs depuis un navigateur hors domaines autorisés)
+     POST /gemini?model=…  en-tête x-goog-api-key  relaie un diagnostic photo vers Gemini, réponse en flux (SSE)
+                        (secours quand Safari n'arrive pas à joindre Google directement)
    Secrets lus dans Supabase Vault via public.verdure_secret : verdure_vapid_keys, verdure_cron_secret.
    Réglage : « Verify JWT » désactivé (l'appli n'a pas de compte utilisateur). */
 import * as webpush from 'jsr:@negrel/webpush@0.5.0';
@@ -47,7 +49,7 @@ const cronSecret = await secret('verdure_cron_secret');
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type',
+  'Access-Control-Allow-Headers': 'content-type, x-goog-api-key',
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -127,6 +129,16 @@ async function handleIdentify(req: Request): Promise<Response> {
   return new Response(await r.text(), { status: r.status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
 
+async function handleGemini(req: Request): Promise<Response> {
+  const key = req.headers.get('x-goog-api-key') ?? '', model = new URL(req.url).searchParams.get('model') ?? '';
+  if (!/^[A-Za-z0-9_-]{20,80}$/.test(key) || !/^gemini-[a-z0-9.-]{1,40}$/.test(model)) return json({ error: { message: 'Requête invalide' } }, 400);
+  const body = await req.arrayBuffer();
+  if (body.byteLength > 8_000_000) return json({ error: { message: 'Photo trop lourde' } }, 413);
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
+    { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body });
+  return new Response(r.body, { status: r.status, headers: { ...CORS, 'Content-Type': r.headers.get('content-type') ?? 'text/event-stream' } });
+}
+
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Méthode non acceptée' }, 405);
@@ -138,6 +150,7 @@ Deno.serve(async req => {
   }
 
   if (route === 'identify') return handleIdentify(req);
+  if (route === 'gemini') return handleGemini(req);
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Requête illisible' }, 400); }

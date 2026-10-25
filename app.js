@@ -347,12 +347,37 @@ function dxContext(p, c) {
   const note = $("#dxNote").value.trim(); if (note) ctx.remarque_utilisateur = note.slice(0, 500);
   return ctx;
 }
+/* Réponse en flux (SSE) : les « pensées » de Gemini arrivent au fil de l'eau et gardent la connexion active,
+   sinon Safari coupe les requêtes longues (« Load failed »). En cas d'échec réseau, relais par la fonction serveur. */
+const geminiFetch = (key, model, body, relay) => fetch(relay ? `${PUSH_API}/gemini?model=${model}` : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
+  { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) });
 async function geminiCall(key, body) {
   for (const model of GEMINI_MODELS) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) });
+    let r;
+    try { r = await geminiFetch(key, model, body, false); }
+    catch { r = await geminiFetch(key, model, body, true); }
     if ([404, 429, 500, 503].includes(r.status) && model !== GEMINI_MODELS.at(-1)) continue;
     return r;
   }
+}
+async function readGemini(r, onThought) {
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = "", text = "", finish = "";
+  const line = l => {
+    if (!l.startsWith("data:")) return;
+    let j; try { j = JSON.parse(l.slice(5)); } catch { return; }
+    const cand = j.candidates?.[0];
+    finish = cand?.finishReason || j.promptFeedback?.blockReason || finish;
+    for (const part of cand?.content?.parts || []) { if (part.thought) onThought(); else text += part.text || ""; }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i; while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
+  }
+  line(buf.trim());
+  return { text, finish };
 }
 async function aiDiagnose(key, p, c) {
   const b64 = dxImg.url.split(",")[1];
@@ -362,21 +387,22 @@ Méthode : 1) décris précisément ce qui est visible (partie de la plante, cou
 Base de problèmes connus (id : nom) : ${PROBLEMS.map(x => `${x.id} : ${x.nom}`).join(" ; ")}.
 Contexte : ${JSON.stringify(dxContext(p, c))}`;
   const contents = [{ parts: [{ inline_data: { mime_type: "image/jpeg", data: b64 } }, { text: prompt }] }];
-  let r = await geminiCall(key, { contents, generationConfig: { maxOutputTokens: 8192, responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: DX_SCHEMA } } } });
+  const thinking = { thinkingLevel: "low", includeThoughts: true };
+  let r = await geminiCall(key, { contents, generationConfig: { maxOutputTokens: 8192, thinkingConfig: thinking, responseFormat: { text: { mimeType: "APPLICATION_JSON", schema: DX_SCHEMA } } } });
   if (r.status === 400) {
     const err = await r.clone().json().catch(() => ({}));
-    if (!/API key|API_KEY/i.test(JSON.stringify(err))) r = await geminiCall(key, { contents, generationConfig: { maxOutputTokens: 8192, responseMimeType: "application/json", responseJsonSchema: DX_SCHEMA } });
+    if (!/API key|API_KEY/i.test(JSON.stringify(err))) r = await geminiCall(key, { contents, generationConfig: { maxOutputTokens: 8192, thinkingConfig: { includeThoughts: true }, responseMimeType: "application/json", responseJsonSchema: DX_SCHEMA } });
   }
   if (!r.ok) {
     const err = await r.json().catch(() => ({})), msg = err.error?.message || "";
     const e = new Error(msg); e.status = r.status; throw e;
   }
-  const j = await r.json(), cand = j.candidates?.[0];
-  const txt = (cand?.content?.parts || []).filter(x => !x.thought).map(x => x.text || "").join("");
+  const t0 = Date.now(), tick = () => { $("#dxPhotoOut").innerHTML = `<p class="note">L'expert examine la photo… ${Math.round((Date.now() - t0) / 1000)} s</p>`; };
+  const { text: txt, finish } = await readGemini(r, tick);
   const a = txt.indexOf("{"), b = txt.lastIndexOf("}");
-  if (a < 0 || b < a) { const e = new Error(`réponse vide (${cand?.finishReason || j.promptFeedback?.blockReason || "sans motif"})`); e.parse = true; throw e; }
+  if (a < 0 || b < a) { const e = new Error(`réponse vide (${finish || "sans motif"})`); e.parse = true; throw e; }
   try { return JSON.parse(txt.slice(a, b + 1)); }
-  catch { const e = new Error(`réponse incomplète (${cand?.finishReason || "illisible"})`); e.parse = true; throw e; }
+  catch { const e = new Error(`réponse incomplète (${finish || "illisible"})`); e.parse = true; throw e; }
 }
 const certLabel = n => n >= 75 ? "très probable" : n >= 50 ? "probable" : n >= 25 ? "possible" : "peu probable";
 function renderAi(res, c) {
