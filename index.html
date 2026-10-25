@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Verdure</title>
+<meta name="description" content="Carnet de soins gratuit pour vos plantes : rappels, identification, diagnostic.">
+<meta name="theme-color" content="#3d6b45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Verdure">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Verdure</h1><p>Carnet de soins pour vos plantes, gratuit.</p></div>
+  </header>
+
+  <!-- JARDIN -->
+  <section id="v-jardin">
+    <div class="card" id="installHint" hidden>
+      <h3>Installez Verdure sur votre iPhone</h3>
+      <p class="note">Dans Safari, touchez le bouton Partager puis « Sur l'écran d'accueil ». Les notifications d'arrosage ne marchent que depuis l'icône installée.</p>
+    </div>
+    <div class="today" id="today"></div>
+    <div class="row" style="justify-content:space-between">
+      <h2>Mon jardin</h2>
+      <button class="primary small" id="addBtn">+ Ajouter</button>
+    </div>
+    <div class="grid" id="garden"></div>
+  </section>
+
+  <!-- IDENTIFIER -->
+  <section id="v-identifier" hidden>
+    <h2>Identifier une plante</h2>
+    <p class="note">Prenez en photo une feuille ou une fleur, bien éclairée et nette. Identification par Pl@ntNet.</p>
+    <label>Partie photographiée<select id="idOrgan">
+      <option value="auto">Je ne sais pas</option><option value="leaf">Feuille</option><option value="flower">Fleur</option>
+      <option value="fruit">Fruit</option><option value="bark">Écorce</option><option value="habit">Plante entière</option>
+    </select></label>
+    <div class="drop" id="idDrop" tabindex="0"><span>Toucher pour prendre ou choisir une photo</span></div>
+    <input type="file" id="idFile" accept="image/*" hidden>
+    <button class="primary" id="idGo" disabled>Identifier</button>
+    <div id="idOut"></div>
+  </section>
+
+  <!-- DIAGNOSTIC -->
+  <section id="v-diagnostic" hidden>
+    <h2>Diagnostic</h2>
+    <p class="note">Cochez ce que vous voyez sur la plante.</p>
+    <div class="sym" id="symptoms"></div>
+    <label>Plante concernée<select id="dxPlant"></select></label>
+    <div id="dxOut" style="display:flex;flex-direction:column;gap:8px"></div>
+  </section>
+
+  <!-- FICHES -->
+  <section id="v-fiches" hidden>
+    <div class="card">
+      <h3>Quelle lumière à cet endroit ?</h3>
+      <p class="note">Indiquez la fenêtre la plus proche de l'endroit où vous voulez poser la plante.</p>
+      <div class="row">
+        <label style="flex:1">Fenêtre orientée<select id="lOrient"><option value="3">Sud</option><option value="2">Ouest</option><option value="2">Est</option><option value="1">Nord</option><option value="0">Pas de fenêtre</option></select></label>
+        <label style="flex:1">Distance<select id="lDist"><option value="0">Contre la vitre</option><option value="1">1 à 2 m</option><option value="2">Plus de 2 m</option></select></label>
+      </div>
+      <div id="lOut"></div>
+    </div>
+    <h2>Fiches de soins</h2>
+    <input id="search" placeholder="Rechercher : monstera, cactus, orchidée…" aria-label="Rechercher une plante">
+    <div id="catalog" style="display:flex;flex-direction:column;gap:8px"></div>
+  </section>
+
+  <!-- RÉGLAGES -->
+  <section id="v-reglages" hidden>
+    <h2>Réglages</h2>
+    <div class="card">
+      <h3>Notifications</h3>
+      <p class="note" id="notifState">Un rappel chaque matin vers 8 h quand une plante a besoin de vous.</p>
+      <div class="row"><button class="primary" id="notifOn">Activer les notifications</button><button id="notifTest" hidden>Envoyer un essai</button><button class="ghost" id="notifOff" hidden>Désactiver</button></div>
+    </div>
+    <div class="card">
+      <h3>Clé Pl@ntNet</h3>
+      <p class="note">Gratuite : créez un compte sur my.plantnet.org, copiez votre clé API et ajoutez <b>michaelsaligne-sudo.github.io</b> dans les domaines autorisés de votre compte.</p>
+      <label>Clé API<input id="pnKey" autocomplete="off" spellcheck="false" placeholder="2b10…"></label>
+      <div class="row"><button class="primary" id="pnSave">Enregistrer la clé</button><a class="btn" href="https://my.plantnet.org" target="_blank" rel="noopener">Ouvrir my.plantnet.org</a></div>
+    </div>
+    <div class="card">
+      <h3>Sauvegarde</h3>
+      <p class="note">Vos plantes restent sur ce téléphone. Gardez une copie pour ne rien perdre en changeant d'appareil.</p>
+      <div class="row"><button id="backupOut">Télécharger une sauvegarde</button><button id="backupIn">Restaurer</button></div>
+      <input type="file" id="backupFile" accept="application/json,.json" hidden>
+    </div>
+    <p class="note">Verdure est gratuite et open source. Identification : Pl@ntNet (pl@ntnet.org).</p>
+  </section>
+</div>
+
+<nav aria-label="Navigation">
+  <button data-v="jardin" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21v-8M12 13c0-4 3-7 7-7 0 4-3 7-7 7zM12 15c0-3-2.5-5.5-6-5.5 0 3 2.5 5.5 6 5.5z"/><path d="M7 21h10"/></svg>Jardin</button>
+  <button data-v="identifier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l1.5-3h5L16 7"/></svg>Identifier</button>
+  <button data-v="diagnostic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M11 8v6M8 11h6"/></svg>Diagnostic</button>
+  <button data-v="fiches"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>Fiches</button>
+  <button data-v="reglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Réglages</button>
+</nav>
+
+<dialog id="addDlg">
+  <form method="dialog" id="addForm" style="display:flex;flex-direction:column;gap:12px">
+    <h3 id="addTitle">Ajouter une plante</h3>
+    <label>Espèce<select id="fSpecies"></select></label>
+    <label>Surnom (facultatif)<input id="fName" placeholder="ex. Le grand du salon"></label>
+    <label>Pièce<input id="fRoom" placeholder="Salon, chambre, balcon…"></label>
+    <div class="row">
+      <label style="flex:1">Arroser tous les (jours)<input id="fEvery" type="number" inputmode="numeric" min="1" max="60"></label>
+      <label style="flex:1">Dernier arrosage<input id="fLast" type="date"></label>
+    </div>
+    <div class="row">
+      <label style="flex:1">Brumiser tous les (jours, 0 = jamais)<input id="fMist" type="number" inputmode="numeric" min="0" max="60"></label>
+      <label style="flex:1">Engrais tous les (jours, 0 = jamais)<input id="fFeed" type="number" inputmode="numeric" min="0" max="365"></label>
+    </div>
+    <label>Dernier rempotage<input id="fRepot" type="date"></label>
+    <label>Photo (facultatif)<input id="fPhoto" type="file" accept="image/*"></label>
+    <div class="row" style="justify-content:space-between">
+      <button type="button" class="ghost" id="fDelete" hidden>Retirer du jardin</button>
+      <div class="row" style="margin-left:auto"><button type="button" id="fCancel">Annuler</button><button type="submit" class="primary">Enregistrer</button></div>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
