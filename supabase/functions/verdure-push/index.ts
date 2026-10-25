@@ -9,7 +9,7 @@
 import * as webpush from 'jsr:@negrel/webpush@0.5.0';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const SITE_URL = 'https://michaelsaligne-sudo.github.io/verdure-/';
+const CONTACT = 'https://github.com/michaelsaligne-sudo/verdure-';
 const GONE_STATUSES = new Set([404, 410]);
 const MAX_TASKS = 200;
 
@@ -37,7 +37,7 @@ async function secret(name: string): Promise<string> {
 }
 
 const appServer = await webpush.ApplicationServer.new({
-  contactInformation: SITE_URL,
+  contactInformation: CONTACT,
   vapidKeys: await webpush.importVapidKeys(JSON.parse(await secret('verdure_vapid_keys'))),
 });
 const cronSecret = await secret('verdure_cron_secret');
@@ -74,7 +74,7 @@ function cleanTasks(raw: unknown): Task[] | null {
 async function push(row: Pick<Row, 'endpoint' | 'p256dh' | 'auth'>, title: string, body: string): Promise<'sent' | 'gone' | string> {
   try {
     await appServer.subscribe({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } })
-      .pushTextMessage(JSON.stringify({ title, body, url: SITE_URL }),
+      .pushTextMessage(JSON.stringify({ title, body }),
         { urgency: webpush.Urgency.Normal, ttl: 12 * 3600, topic: 'soins' });
     return 'sent';
   } catch (err) {

@@ -2,7 +2,7 @@
 
 Carnet de soins gratuit pour vos plantes, installable sur iPhone et Android comme une appli (PWA).
 
-**Ouvrir l'appli : https://michaelsaligne-sudo.github.io/verdure-/**
+Hébergée gratuitement sur Vercel (import du dépôt, aucun réglage).
 
 ## Fonctions
 - **Jardin** : vos plantes, avec photo, pièce et tâches du jour (arrosage, brumisation, engrais, rempotage).
@@ -13,12 +13,12 @@ Carnet de soins gratuit pour vos plantes, installable sur iPhone et Android comm
 - **Sauvegarde** : export et restauration de vos données (elles restent sur votre téléphone).
 
 ## Installer sur iPhone
-1. Ouvrir le lien ci-dessus dans **Safari**.
+1. Ouvrir l'adresse Vercel de l'appli dans **Safari**.
 2. Bouton Partager, puis **Sur l'écran d'accueil**.
 3. Ouvrir Verdure depuis son icône, aller dans **Réglages** et activer les notifications (iOS 16.4 ou plus récent).
 
 ## Technique
-- Appli statique (HTML, CSS, JavaScript sans dépendance) servie par GitHub Pages, hors ligne grâce au service worker `sw.js`.
+- Appli statique (HTML, CSS, JavaScript sans dépendance) servie par Vercel, hors ligne grâce au service worker `sw.js`.
 - Rappels : fonction Supabase `supabase/functions/verdure-push` et tâche planifiée quotidienne (`supabase/migrations/0001_verdure_push.sql`). Les clés VAPID et le secret de la tâche sont dans Supabase Vault (`verdure_vapid_keys`, `verdure_cron_secret`), jamais dans ce dépôt.
 - Le téléphone n'envoie au serveur que la liste des prochains soins (date et texte), pour pouvoir envoyer les rappels.
 

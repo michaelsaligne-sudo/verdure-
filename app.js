@@ -157,7 +157,7 @@ $("#idGo").onclick = async () => {
   try {
     const r = await fetch(`${PLANTNET_API}?api-key=${encodeURIComponent(key)}&lang=fr&nb-results=4`, { method: "POST", body: fd });
     if (r.status === 404) { out.innerHTML = `<div class="card"><h3>Aucune plante reconnue</h3><p class="note">Essayez une photo plus proche d'une feuille ou d'une fleur, sur fond simple.</p></div>`; return; }
-    if (r.status === 401 || r.status === 403) { out.innerHTML = `<p class="note">Pl@ntNet refuse la clé. Vérifiez-la dans Réglages, et que michaelsaligne-sudo.github.io figure dans les domaines autorisés de votre compte Pl@ntNet.</p>`; return; }
+    if (r.status === 401 || r.status === 403) { out.innerHTML = `<p class="note">Pl@ntNet refuse la clé. Vérifiez-la dans Réglages, et que ${esc(location.hostname)} figure dans les domaines autorisés de votre compte Pl@ntNet.</p>`; return; }
     if (r.status === 429) { out.innerHTML = `<p class="note">Quota Pl@ntNet du jour atteint. Réessayez demain.</p>`; return; }
     if (!r.ok) throw new Error(r.status);
     const data = await r.json(), best = data.results?.[0];
@@ -264,6 +264,7 @@ $("#notifTest").onclick = async () => {
 };
 
 /* ---------- réglages : clé Pl@ntNet, sauvegarde ---------- */
+$("#siteHost").textContent = location.hostname;
 $("#pnKey").value = store.get("verdure.plantnetKey", "");
 $("#pnSave").onclick = () => { store.set("verdure.plantnetKey", $("#pnKey").value.trim()); toast("Clé enregistrée sur ce téléphone"); };
 $("#backupOut").onclick = () => {
