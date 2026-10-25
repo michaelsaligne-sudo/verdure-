@@ -1,5 +1,6 @@
 /* Verdure : carnet de soins des plantes. Données sur l'appareil, rappels par notification, identification Pl@ntNet. */
 const PUSH_API = "https://tpautawxuufeontnhjjc.supabase.co/functions/v1/verdure-push";
+const PLANTNET_API = "https://my-api.plantnet.org/v2/identify/all";
 const VAPID_PUBLIC = "BNJ5yx2Z1b7uupvr7-3_36jMc1fuXQ3wZ7mT6uFsSo-YkeAHn1VLHM6HJTa7tAs0iU80KzDX5_o2j6VegFeaf0E";
 
 /* ---------- utilitaires ---------- */
@@ -152,13 +153,15 @@ $("#idGo").onclick = async () => {
   const out = $("#idOut"), key = store.get("verdure.plantnetKey", "");
   if (!key) { out.innerHTML = `<div class="card"><h3>Il manque la clé Pl@ntNet</h3><p class="note">Elle est gratuite. Ajoutez-la dans l'onglet Réglages.</p><button class="small" onclick="show('reglages')">Ouvrir les réglages</button></div>`; return; }
   $("#idGo").disabled = true; out.innerHTML = `<p class="note">Analyse de la photo…</p>`;
-  const fd = new FormData(); fd.append("images", idImg.blob, "photo.jpg"); fd.append("organs", $("#idOrgan").value); fd.append("key", key);
+  const form = withKey => { const fd = new FormData(); fd.append("images", idImg.blob, "photo.jpg"); fd.append("organs", $("#idOrgan").value); if (withKey) fd.append("key", key); return fd; };
   try {
-    const r = await fetch(`${PUSH_API}/identify`, { method: "POST", body: fd });
+    // Appel direct (clé « exposée » + domaine autorisé sur my.plantnet.org), sinon relais par le serveur.
+    let r = await fetch(`${PLANTNET_API}?api-key=${encodeURIComponent(key)}&lang=fr&nb-results=4`, { method: "POST", body: form(false) }).catch(() => null);
+    if (!r || r.status === 401 || r.status === 403) r = await fetch(`${PUSH_API}/identify`, { method: "POST", body: form(true) });
     if (r.status === 404) { out.innerHTML = `<div class="card"><h3>Aucune plante reconnue</h3><p class="note">Essayez une photo plus proche d'une feuille ou d'une fleur, sur fond simple.</p></div>`; return; }
     if (r.status === 401 || r.status === 403) {
       const why = await r.json().then(j => j.message || j.error || "").catch(() => "");
-      out.innerHTML = `<p class="note">Pl@ntNet refuse la clé (code ${r.status}${why ? " : " + esc(why) : ""}). Vérifiez-la dans Réglages.</p>`; return;
+      out.innerHTML = `<p class="note">Pl@ntNet refuse la clé (code ${r.status}${why ? " : " + esc(why) : ""}).<br>Sur my.plantnet.org, cochez « Expose my API key » et ajoutez <b>${esc(location.origin)}</b> dans « Authorized domains ».</p>`; return;
     }
     if (r.status === 429) { out.innerHTML = `<p class="note">Quota Pl@ntNet du jour atteint. Réessayez demain.</p>`; return; }
     if (!r.ok) throw new Error(r.status);
@@ -266,6 +269,7 @@ $("#notifTest").onclick = async () => {
 };
 
 /* ---------- réglages : clé Pl@ntNet, sauvegarde ---------- */
+$("#siteOrigin").textContent = location.origin;
 $("#pnKey").value = store.get("verdure.plantnetKey", "");
 $("#pnSave").onclick = () => { const k = $("#pnKey").value.replace(/[\s"'«»]/g, ""); $("#pnKey").value = k; store.set("verdure.plantnetKey", k); toast("Clé enregistrée sur ce téléphone"); };
 $("#backupOut").onclick = () => {
