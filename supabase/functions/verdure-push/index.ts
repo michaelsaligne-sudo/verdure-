@@ -75,10 +75,13 @@ async function push(row: Pick<Row, 'endpoint' | 'p256dh' | 'auth'>, title: strin
   try {
     await appServer.subscribe({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } })
       .pushTextMessage(JSON.stringify({ title, body }),
-        { urgency: webpush.Urgency.Normal, ttl: 12 * 3600, topic: 'soins' });
+        { urgency: webpush.Urgency.Normal, ttl: 12 * 3600 });
     return 'sent';
   } catch (err) {
-    if (err instanceof webpush.PushMessageError && GONE_STATUSES.has(err.response.status)) return 'gone';
+    if (err instanceof webpush.PushMessageError) {
+      if (GONE_STATUSES.has(err.response.status)) return 'gone';
+      return `${err.response.status} ${await err.response.text().catch(() => '')}`.trim();
+    }
     return String(err);
   }
 }
