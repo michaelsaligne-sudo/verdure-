@@ -10,6 +10,7 @@ Hébergée gratuitement sur Vercel (import du dépôt, aucun réglage).
 - **Identifier** : photo d une feuille ou d une fleur, reconnue par [Pl@ntNet](https://plantnet.org) directement depuis le téléphone (clé gratuite à saisir dans Réglages, avec « Expose my API key » coché et l'adresse du site dans « Authorized domains »).
 - **Saison et météo** : alertes gel, chaleur, pluie et chauffage selon votre ville (Open-Meteo, gratuit, sans clé), arrosages adaptés à la saison, gestes du mois.
 - **Diagnostic** : par photo avec Google Gemini (clé gratuite dans Réglages), qui tient compte de l'espèce, de vos arrosages, de la saison et de la météo, et donne les gestes à faire tout de suite ; sinon Pl@ntNet. Par symptômes : 44 signes, 41 problèmes (soins, ravageurs, maladies, phénomènes normaux) classés selon la plante, vos soins, la saison et la météo.
+- **Suivi des soins** : un diagnostic s'enregistre dans la fiche de la plante avec sa check-list (tout de suite, ensuite), à cocher étape par étape ; avancement visible au jardin, rappel dans les notifications, historique des soins résolus.
 - **Fiches** : 61 plantes rangées par catégorie, avec terre, rempotage, hiver, taille et soucis fréquents, un calendrier des soins mois par mois et un estimateur de lumière.
 - **Sauvegarde** : export et restauration de vos données (elles restent sur votre téléphone).
 

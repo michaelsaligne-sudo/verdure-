@@ -92,3 +92,16 @@ section > p{margin:0}
 .step.avoid{border-left-color:var(--muted)}
 .result h2{margin:2px 0 4px}
 textarea{resize:vertical}
+/* Suivi des soins */
+.diag{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.diag.done{opacity:.75}
+.diag .thumb{width:64px;height:64px}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar span{display:block;height:100%;background:var(--moss)}
+label.check{flex-direction:row;align-items:flex-start;gap:10px;color:var(--fg);padding:6px 0;border-bottom:1px solid var(--line)}
+label.check input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--moss)}
+label.check input:checked+span{color:var(--muted)}
+label.check input:checked+span .st{text-decoration:line-through}
+label.check small{display:block;text-decoration:none;font-size:12px}
+.card.save{gap:8px;display:flex;flex-direction:column}
+#careDlg{max-height:88vh;overflow:auto}

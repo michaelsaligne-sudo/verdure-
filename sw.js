@@ -1,5 +1,5 @@
 /* Service worker de Verdure : fonctionnement hors ligne et réception des rappels. */
-const CACHE = "verdure-v11";
+const CACHE = "verdure-v12";
 const SHELL = ["./", "index.html", "styles.css", "data.js", "fiches.js", "problems.js", "saison.js", "app.js", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

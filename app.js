@@ -133,19 +133,20 @@ function render() {
   } else {
     const sorted = [...plants].sort((a, b) => status(a).d - status(b).d);
     g.innerHTML = sorted.map(p => {
-      const s = status(p), c = bySpecies(p.species), title = plantName(p), extra = dueTasks(p).filter(t => t.k !== "water");
+      const s = status(p), c = bySpecies(p.species), title = plantName(p), extra = dueTasks(p).filter(t => t.k !== "water"), ad = activeDiag(p), [dn, dt] = ad ? progress(ad) : [0, 0];
       return `<article class="plant">
         ${p.photo ? `<img class="thumb" src="${p.photo}" alt="">` : `<div class="thumb" aria-hidden="true">${esc(title[0])}</div>`}
         <div class="meta"><h3>${esc(title)}</h3><span class="latin">${esc(p.latin || c.latin || c.nom)}${p.room ? " · " + esc(p.room) : ""}</span>
-          <div class="chips"><span class="chip ${s.cls}">${s.txt}</span><span class="chip">tous les ${p.every} j</span>${extra.map(t => `<span class="chip due">${t.verb}</span>`).join("")}</div>
-          <div class="row"><button class="water small" data-water="${p.id}">Arrosé</button>${extra.map(t => `<button class="small" data-task="${t.k}" data-pid="${p.id}">${t.done}</button>`).join("")}<button class="small" data-edit="${p.id}">Modifier</button><button class="small ghost" data-info="${p.species}">Fiche</button></div>
+          <div class="chips"><span class="chip ${s.cls}">${s.txt}</span><span class="chip">tous les ${p.every} j</span>${extra.map(t => `<span class="chip due">${t.verb}</span>`).join("")}${ad ? `<span class="chip late">${esc(ad.titre)} · ${dn}/${dt}</span>` : ""}</div>
+          <div class="row"><button class="water small" data-water="${p.id}">Arrosé</button>${extra.map(t => `<button class="small" data-task="${t.k}" data-pid="${p.id}">${t.done}</button>`).join("")}<button class="small" data-care="${p.id}">Suivi${p.diags?.length ? ` (${p.diags.length})` : ""}</button><button class="small" data-edit="${p.id}">Modifier</button><button class="small ghost" data-info="${p.species}">Fiche</button></div>
         </div></article>`;
     }).join("");
     const todo = TASKS.map(t => ({ t, ps: plants.filter(p => { const d = due(p, t); return d !== null && d <= 0; }) })).filter(x => x.ps.length);
-    const first = sorted[0];
+    const first = sorted[0], care = plants.map(p => ({ p, d: activeDiag(p) })).filter(x => x.d && x.d.steps.some(s => !s.done));
     $("#today").innerHTML = `<span class="eyebrow">Aujourd'hui · ${new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>` +
       (todo.length ? todo.map(x => `<strong>${x.t.verb} : ${x.ps.map(p => esc(plantName(p))).join(", ")}</strong>`).join("")
-        : `<strong>Rien à faire aujourd'hui. Prochain arrosage ${status(first).txt.replace("Arrosage ", "")}.</strong>`);
+        : `<strong>Rien à faire aujourd'hui. Prochain arrosage ${status(first).txt.replace("Arrosage ", "")}.</strong>`) +
+      (care.length ? `<strong>Soins en cours : ${care.map(x => `${esc(plantName(x.p))} (${x.d.steps.filter(s => !s.done).length} étape${x.d.steps.filter(s => !s.done).length > 1 ? "s" : ""})`).join(", ")}</strong>` : "");
   }
   const sel = $("#dxPlant").value;
   $("#dxPlant").innerHTML = `<option value="">Non précisée</option>` + plants.map(p => `<option value="${p.id}">${esc(plantName(p))}</option>`).join("");
@@ -158,6 +159,7 @@ $("#garden").addEventListener("click", e => {
   if (b.dataset.water) { const p = plants.find(x => x.id === b.dataset.water); savePlant({ ...p, last: todayISO() }); toast("Arrosage noté"); }
   if (b.dataset.task) { const p = plants.find(x => x.id === b.dataset.pid), t = TASKS.find(x => x.k === b.dataset.task); savePlant(t.set(p, todayISO())); toast(t.done + ", c'est noté"); }
   if (b.dataset.edit) openAdd(plants.find(x => x.id === b.dataset.edit));
+  if (b.dataset.care) openCare(b.dataset.care);
   if (b.dataset.info) { show("fiches"); $("#catFilter").value = ""; $("#search").value = bySpecies(b.dataset.info).nom; renderCatalog(true); }
 });
 
@@ -423,6 +425,13 @@ function renderAi(res, c) {
     ${dx.slice(1).filter(d => d.base_id !== "aucun").length ? `<p class="note">Autres pistes : ${dx.slice(1).filter(d => d.base_id !== "aucun").map(d => `${esc(d.nom)} (${certLabel(d.certitude)})`).join(", ")}</p>` : ""}
     ${dx.filter(d => PB(d.base_id)).length ? `<h3>Fiches conseil</h3>` + dx.filter(d => PB(d.base_id)).map((d, i) => pbCard(PB(d.base_id), c, false)).join("") : ""}
     <p class="note">Analyse par intelligence artificielle (Google Gemini) : faites le test « pour confirmer » avant un geste important comme un dépotage.</p>`;
+  offerSave(out, async () => ({
+    source: "diagnostic photo", titre: healthy ? "Contrôle : pas de problème visible" : main.nom,
+    detail: main && !healthy ? `${certLabel(main.certitude)} (${main.certitude} %) · ${main.indices}` : `État ${res.etat_general}`,
+    obs: res.observations || [], avoid: res.a_eviter || [], pb: main?.base_id || "",
+    thumb: (await resize(dxImg.blob, 240, .7)).url,
+    steps: steps([res.pour_confirmer ? "Vérifier : " + res.pour_confirmer : "", ...(res.tout_de_suite || [])], res.ensuite || [])
+  }));
 }
 async function plantnetDiagnose(key) {
   const out = $("#dxPhotoOut"), fd = new FormData(); fd.append("images", dxImg.blob, "photo.jpg");
@@ -470,8 +479,80 @@ function renderDx() {
   const ranked = rankProblems(picked, p, c).slice(0, 4), top = ranked[0]?.score || 1;
   $("#dxOut").innerHTML = `<p class="note">Causes les plus probables${c && c.id !== "autre" ? " pour " + esc(c.nom.toLowerCase()) : ""}, de la plus probable à la moins probable :</p>` +
     ranked.map((r, i) => pbCard(r.pb, c, i === 0, `<p class="note">${r.score >= top * .8 ? "Très compatible" : "Compatible"} · signes : ${r.hits.map(esc).join(", ").toLowerCase()}${r.why.length ? "<br>" + r.why.map(esc).join("<br>") : ""}</p>`)).join("");
+  const best = ranked[0]?.pb; if (!best) return;
+  offerSave($("#dxOut"), async () => ({
+    source: "diagnostic par symptômes", titre: best.nom, detail: "Signes : " + ranked[0].hits.join(", ").toLowerCase(), obs: picked, avoid: [], pb: best.id,
+    steps: steps([best.vite], [best.faire, best.saison?.[seasonOf()], best.prevenir])
+  }));
 }
 $("#symptoms").onchange = renderDx; $("#dxPlant").onchange = renderDx;
+
+/* ---------- suivi des soins : diagnostics enregistrés dans la fiche de la plante ---------- */
+const activeDiag = p => (p.diags || []).find(d => !d.resolved);
+const progress = d => [d.steps.filter(s => s.done).length, d.steps.length];
+/* Propose d'enregistrer un diagnostic ; make() renvoie le diagnostic à ranger dans p.diags. */
+function offerSave(out, make) {
+  const { p } = dxPlantSel(), box = document.createElement("div");
+  box.className = "card save";
+  box.innerHTML = plants.length ? `<b>Suivre ces soins</b><p class="note">Le diagnostic et sa check-list seront rangés dans la fiche de la plante, pour cocher chaque étape.</p>
+    ${p ? "" : `<label>Plante<select class="savePlant">${plants.map(x => `<option value="${x.id}">${esc(plantName(x))}</option>`).join("")}</select></label>`}
+    <button class="primary">Enregistrer dans la fiche${p ? " de " + esc(plantName(p)) : ""}</button>`
+    : `<p class="note">Ajoutez la plante à votre jardin pour enregistrer ce diagnostic et suivre les soins étape par étape.</p>`;
+  out.append(box);
+  const btn = box.querySelector("button"); if (!btn) return;
+  btn.onclick = async () => {
+    const id = p ? p.id : box.querySelector(".savePlant").value, plant = plants.find(x => x.id === id);
+    btn.disabled = true;
+    const d = { id: "d" + Date.now().toString(36), date: todayISO(), resolved: "", ...(await make()) };
+    savePlant({ ...plant, diags: [d, ...(plant.diags || [])] });
+    box.innerHTML = `<p><b>Enregistré.</b> Retrouvez la check-list dans Jardin, bouton « Suivi » de ${esc(plantName(plant))}.</p><button class="small">Ouvrir le suivi</button>`;
+    box.querySelector("button").onclick = () => openCare(plant.id);
+  };
+}
+const steps = (now, later) => [...now.filter(Boolean).map(t => ({ t, k: "now", done: "" })), ...later.filter(Boolean).map(t => ({ t, k: "later", done: "" }))];
+let careId = null;
+function openCare(id) { careId = id; renderCare(); if (!$("#careDlg").open) $("#careDlg").showModal(); }
+function renderCare() {
+  const p = plants.find(x => x.id === careId); if (!p) return $("#careDlg").close();
+  const ds = p.diags || [];
+  const card = d => { const [n, t] = progress(d); return `<div class="diag ${d.resolved ? "done" : ""}" data-did="${d.id}">
+      <div class="row" style="align-items:flex-start;gap:10px">${d.thumb ? `<img class="thumb" src="${d.thumb}" alt="">` : ""}<div style="flex:1">
+        <span class="eyebrow">${new Date(d.date + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} · ${esc(d.source)}${d.resolved ? " · résolu" : ""}</span>
+        <h3 style="margin:2px 0">${esc(d.titre)}</h3>${d.detail ? `<p class="note">${esc(d.detail)}</p>` : ""}</div></div>
+      ${d.obs?.length ? `<details><summary>Ce qui a été observé</summary><ul>${d.obs.map(o => `<li>${esc(o)}</li>`).join("")}</ul></details>` : ""}
+      <div class="bar" role="progressbar" aria-valuenow="${n}" aria-valuemax="${t}"><span style="width:${t ? n / t * 100 : 0}%"></span></div>
+      <p class="note">${n} étape${n > 1 ? "s" : ""} sur ${t} faite${n > 1 ? "s" : ""}</p>
+      ${["now", "later"].map(k => { const xs = d.steps.map((s, i) => ({ s, i })).filter(x => x.s.k === k); return xs.length ? `<p class="eyebrow" style="margin:8px 0 4px">${k === "now" ? "Tout de suite" : "Ensuite"}</p>` + xs.map(({ s, i }) => `<label class="check"><input type="checkbox" data-step="${i}" ${s.done ? "checked" : ""}><span><span class="st">${esc(s.t)}</span>${s.done ? `<small>fait le ${new Date(s.done + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</small>` : ""}</span></label>`).join("") : ""; }).join("")}
+      ${d.avoid?.length ? `<div class="step avoid"><b>À éviter</b><ul>${d.avoid.map(o => `<li>${esc(o)}</li>`).join("")}</ul></div>` : ""}
+      <div class="row"><input class="newStep" placeholder="Ajouter une étape" style="flex:1" aria-label="Nouvelle étape"><button class="small" data-act="add">Ajouter</button></div>
+      <div class="row"><button class="small ${d.resolved ? "" : "primary"}" data-act="resolve">${d.resolved ? "Rouvrir" : "Marquer comme résolu"}</button><button class="small ghost" data-act="del">Supprimer</button></div>
+    </div>`; };
+  const open = ds.filter(d => !d.resolved), closed = ds.filter(d => d.resolved);
+  $("#careBody").innerHTML = `<h3>Suivi de ${esc(plantName(p))}</h3>` + (ds.length ? open.map(card).join("") + (closed.length ? `<details><summary>Historique (${closed.length})</summary>${closed.map(card).join("")}</details>` : "")
+    : `<p class="note">Aucun diagnostic enregistré. Dans l'onglet Diagnostic, choisissez cette plante, analysez une photo ou cochez des symptômes, puis touchez « Enregistrer dans la fiche ».</p><button class="small" data-act="go">Faire un diagnostic</button>`);
+}
+function updateDiag(did, fn) {
+  const p = plants.find(x => x.id === careId);
+  savePlant({ ...p, diags: p.diags.map(d => d.id === did ? fn({ ...d, steps: [...d.steps] }) : d) }); renderCare();
+}
+$("#careBody").addEventListener("change", e => {
+  const cb = e.target.closest("[data-step]"); if (!cb) return;
+  const did = cb.closest("[data-did]").dataset.did, i = +cb.dataset.step;
+  updateDiag(did, d => { d.steps[i] = { ...d.steps[i], done: cb.checked ? todayISO() : "" }; const [n, t] = progress(d); if (cb.checked && n === t) toast("Toutes les étapes sont faites : marquez le soin comme résolu quand la plante va mieux"); return d; });
+});
+$("#careBody").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  if (b.dataset.act === "go") { $("#careDlg").close(); $("#dxPlant").value = careId; show("diagnostic"); renderDx(); return; }
+  const box = b.closest("[data-did]"), did = box.dataset.did;
+  if (b.dataset.act === "add") { const t = box.querySelector(".newStep").value.trim(); if (t) updateDiag(did, d => { d.steps.push({ t: t.slice(0, 200), k: "later", done: "" }); return d; }); }
+  if (b.dataset.act === "resolve") updateDiag(did, d => ({ ...d, resolved: d.resolved ? "" : todayISO() }));
+  if (b.dataset.act === "del") {
+    if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Confirmer la suppression"; return; }
+    const p = plants.find(x => x.id === careId); savePlant({ ...p, diags: p.diags.filter(d => d.id !== did) }); renderCare();
+  }
+});
+$("#careBody").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches(".newStep")) { e.preventDefault(); e.target.closest("[data-did]").querySelector("[data-act=add]").click(); } });
+$("#careClose").onclick = () => $("#careDlg").close();
 
 /* ---------- fiches et lumière ---------- */
 const ficheMore = c => `<div class="steps">${c.s ? `<div class="step"><b>Terre</b><p>${c.s}</p></div>` : ""}${c.r ? `<div class="step"><b>Rempotage</b><p>${c.r}${c.e ? " Elle aime être un peu à l'étroit : pot à peine plus grand." : ""}</p></div>` : ""}${c.h ? `<div class="step"><b>En hiver</b><p>${c.h}</p></div>` : ""}${c.t ? `<div class="step"><b>Taille et multiplication</b><p>${c.t}</p></div>` : ""}${c.f?.length ? `<div class="step"><b>Soucis fréquents</b><p>${c.f.map(id => PB(id).nom).join(", ")}</p></div>` : ""}</div>`;
@@ -506,7 +587,8 @@ const pushSupported = () => "serviceWorker" in navigator && "PushManager" in win
 const b64ToBytes = s => { const b = atob((s + "=".repeat((4 - s.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, c => c.charCodeAt(0)); };
 async function currentSub() { if (!pushSupported()) return null; const reg = await navigator.serviceWorker.ready; return reg.pushManager.getSubscription(); }
 function scheduleTasks() {
-  return plants.flatMap(p => TASKS.map(t => { const n = nextDate(p, t); return n ? { due: n, text: `${t.k === "feed" ? "Engrais pour" : t.verb} ${plantName(p)}` } : null; }).filter(Boolean)).slice(0, 200);
+  const care = plants.map(p => { const d = activeDiag(p), s = d?.steps.find(x => !x.done && x.k === "now"); return s ? { due: d.date, text: `Soin ${plantName(p)} : ${s.t}`.slice(0, 80) } : null; }).filter(Boolean);
+  return [...care, ...plants.flatMap(p => TASKS.map(t => { const n = nextDate(p, t); return n ? { due: n, text: `${t.k === "feed" ? "Engrais pour" : t.verb} ${plantName(p)}` } : null; }).filter(Boolean))].slice(0, 200);
 }
 async function api(route, body) {
   const r = await fetch(`${PUSH_API}/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
