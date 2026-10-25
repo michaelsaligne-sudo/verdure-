@@ -4,6 +4,8 @@
      POST /unsubscribe  { endpoint }             oublie un abonnement
      POST /test         { endpoint }             envoie tout de suite une notification d'essai
      POST /send                                  tâche planifiée quotidienne (en-tête x-cron-secret)
+     POST /identify     formulaire { key, organs, images }  relaie une identification vers Pl@ntNet
+                        (Pl@ntNet refuse les appels directs depuis un navigateur hors domaines autorisés)
    Secrets lus dans Supabase Vault via public.verdure_secret : verdure_vapid_keys, verdure_cron_secret.
    Réglage : « Verify JWT » désactivé (l'appli n'a pas de compte utilisateur). */
 import * as webpush from 'jsr:@negrel/webpush@0.5.0';
@@ -111,6 +113,20 @@ async function handleSend(): Promise<Response> {
   return json({ sent: results.filter(r => r.outcome === 'sent').length, gone: gone.length, failed: failed.length });
 }
 
+async function handleIdentify(req: Request): Promise<Response> {
+  let form: FormData;
+  try { form = await req.formData(); } catch { return json({ message: 'Formulaire illisible' }, 400); }
+  const key = form.get('key'), image = form.get('images'), organs = form.get('organs') ?? 'auto';
+  if (typeof key !== 'string' || !/^[A-Za-z0-9]{10,64}$/.test(key)) return json({ message: 'Clé Pl@ntNet invalide' }, 401);
+  if (!(image instanceof File) || image.size > 6_000_000) return json({ message: 'Photo manquante ou trop lourde' }, 400);
+  const out = new FormData();
+  out.append('images', image, 'photo.jpg');
+  out.append('organs', String(organs));
+  const url = `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(key)}&lang=fr&nb-results=4`;
+  const r = await fetch(url, { method: 'POST', body: out });
+  return new Response(await r.text(), { status: r.status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Méthode non acceptée' }, 405);
@@ -120,6 +136,8 @@ Deno.serve(async req => {
     if (!sameSecret(req.headers.get('x-cron-secret') ?? '')) return json({ error: 'Accès refusé' }, 401);
     return handleSend();
   }
+
+  if (route === 'identify') return handleIdentify(req);
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Requête illisible' }, 400); }

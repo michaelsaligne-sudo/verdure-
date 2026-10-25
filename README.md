@@ -7,7 +7,7 @@ Hébergée gratuitement sur Vercel (import du dépôt, aucun réglage).
 ## Fonctions
 - **Jardin** : vos plantes, avec photo, pièce et tâches du jour (arrosage, brumisation, engrais, rempotage).
 - **Notifications** : un rappel chaque matin vers 8 h quand une plante a besoin de vous.
-- **Identifier** : photo d'une feuille ou d'une fleur, reconnue par [Pl@ntNet](https://plantnet.org) (clé gratuite à saisir dans Réglages).
+- **Identifier** : photo d une feuille ou d une fleur, reconnue par [Pl@ntNet](https://plantnet.org) via la fonction serveur (clé gratuite à saisir dans Réglages, aucun domaine à autoriser).
 - **Diagnostic** : causes probables et gestes à faire selon les symptômes.
 - **Fiches** : 26 plantes courantes et un estimateur de lumière.
 - **Sauvegarde** : export et restauration de vos données (elles restent sur votre téléphone).
