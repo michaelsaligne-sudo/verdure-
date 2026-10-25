@@ -75,3 +75,20 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .card p,.today p{margin:0}
 section > p{margin:0}
 .pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:middle}
+/* Saison, alertes météo, étapes de soin */
+#season{display:flex;flex-direction:column;gap:10px}
+#season ul,.step ul,.card ul,#calOut ul{margin:4px 0 0;padding-left:18px}
+#season li,.step li,#calOut li{margin:3px 0}
+.alert{border-radius:10px;padding:10px 12px;background:var(--water-soft);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.alert.gel,.alert.froid,.alert.chaleur{background:var(--warn-soft)}
+.steps{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.step{border-left:3px solid var(--line);padding:6px 10px;background:var(--surface);border-radius:0 10px 10px 0}
+.step b{display:block;font-size:13px;color:var(--muted)}
+.step p{margin:2px 0 0}
+.step.now{border-left-color:var(--warn);background:var(--warn-soft)}
+.step.now b{color:var(--warn)}
+.step.season{border-left-color:var(--water)}
+.step.need{border-left-color:var(--moss)}
+.step.avoid{border-left-color:var(--muted)}
+.result h2{margin:2px 0 4px}
+textarea{resize:vertical}

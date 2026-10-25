@@ -30,6 +30,7 @@
       <p class="note">Dans Safari, touchez le bouton Partager puis « Sur l'écran d'accueil ». Les notifications d'arrosage ne marchent que depuis l'icône installée.</p>
     </div>
     <div class="today" id="today"></div>
+    <div class="card" id="season"></div>
     <div class="row" style="justify-content:space-between">
       <h2>Mon jardin</h2>
       <button class="primary small" id="addBtn">+ Ajouter</button>
@@ -54,18 +55,20 @@
   <!-- DIAGNOSTIC -->
   <section id="v-diagnostic" hidden>
     <h2>Diagnostic</h2>
+    <label>Plante concernée<select id="dxPlant"></select></label>
+    <p class="note" id="dxCtx"></p>
     <div class="card">
       <h3>Par photo</h3>
-      <p class="note">Photographiez de près la partie abîmée (feuille tachée, insectes, moisissure). Analyse par Pl@ntNet.</p>
+      <p class="note" id="dxHow">Photographiez la plante entière, puis de près la partie abîmée, à la lumière du jour. L'analyse tient compte de la plante choisie, de vos arrosages, de la saison et de la météo.</p>
       <div class="drop" id="dxDrop" tabindex="0"><span>Toucher pour prendre ou choisir une photo</span></div>
       <input type="file" id="dxFile" accept="image/*" hidden>
+      <label>Ce que vous avez remarqué (facultatif)<textarea id="dxNote" rows="2" placeholder="ex. les feuilles du bas jaunissent depuis 2 semaines"></textarea></label>
       <button class="primary" id="dxGo" disabled>Analyser la photo</button>
       <div id="dxPhotoOut" style="display:flex;flex-direction:column;gap:10px"></div>
     </div>
     <h3>Par symptômes</h3>
-    <label>Plante concernée<select id="dxPlant"></select></label>
-    <p class="note">Cochez ce que vous voyez sur la plante.</p>
-    <div class="sym" id="symptoms"></div>
+    <p class="note">Cochez tout ce que vous voyez. Plus vous cochez de signes, plus le diagnostic est précis.</p>
+    <div id="symptoms"></div>
     <div id="dxOut" style="display:flex;flex-direction:column;gap:8px"></div>
   </section>
 
@@ -79,6 +82,11 @@
         <label style="flex:1">Distance<select id="lDist"><option value="0">Contre la vitre</option><option value="1">1 à 2 m</option><option value="2">Plus de 2 m</option></select></label>
       </div>
       <div id="lOut"></div>
+    </div>
+    <div class="card">
+      <h3>Calendrier des soins</h3>
+      <label>Mois<select id="calMonth"></select></label>
+      <div id="calOut"></div>
     </div>
     <h2>Fiches de soins</h2>
     <input id="search" placeholder="Rechercher : monstera, cactus, menthe…" aria-label="Rechercher une plante">
@@ -95,6 +103,18 @@
       <div class="row"><button class="primary" id="notifOn">Activer les notifications</button><button id="notifTest" hidden>Envoyer un essai</button><button class="ghost" id="notifOff" hidden>Désactiver</button></div>
     </div>
     <div class="card">
+      <h3>Ma ville, pour la météo</h3>
+      <p class="note" id="placeState">La météo locale sert aux alertes (gel, canicule, pluie) et au diagnostic. Données Open-Meteo, gratuites.</p>
+      <div class="row"><input id="placeName" placeholder="ex. Lyon" style="flex:1" aria-label="Ville"><button id="placeFind">Chercher</button></div>
+      <button id="placeGps">Utiliser ma position</button>
+    </div>
+    <div class="card">
+      <h3>Clé Gemini, pour le diagnostic photo</h3>
+      <p class="note">Gratuite : connectez-vous avec un compte Google sur Google AI Studio, touchez « Create API key », copiez la clé et collez-la ici. Elle reste sur ce téléphone. Sans elle, le diagnostic photo utilise Pl@ntNet, moins précis pour les plantes d'intérieur.</p>
+      <label>Clé API Gemini<input id="gmKey" autocomplete="off" spellcheck="false" placeholder="AIza…"></label>
+      <div class="row"><button class="primary" id="gmSave">Enregistrer la clé</button><a class="btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Ouvrir Google AI Studio</a></div>
+    </div>
+    <div class="card">
       <h3>Clé Pl@ntNet</h3>
       <p class="note">Gratuite : créez un compte sur my.plantnet.org, copiez votre clé API et collez-la ici. Dans les réglages de la clé, cochez « Expose my API key » et ajoutez <b id="siteOrigin">l'adresse de ce site</b> dans « Authorized domains ».</p>
       <label>Clé API<input id="pnKey" autocomplete="off" spellcheck="false" placeholder="2b10…"></label>
@@ -106,7 +126,7 @@
       <div class="row"><button id="backupOut">Télécharger une sauvegarde</button><button id="backupIn">Restaurer</button></div>
       <input type="file" id="backupFile" accept="application/json,.json" hidden>
     </div>
-    <p class="note">Verdure est gratuite. Identification : Pl@ntNet (pl@ntnet.org).</p>
+    <p class="note">Verdure est gratuite. Identification : Pl@ntNet (pl@ntnet.org). Météo : Open-Meteo. Diagnostic photo : Google Gemini.</p>
   </section>
 </div>
 
@@ -123,7 +143,10 @@
     <h3 id="addTitle">Ajouter une plante</h3>
     <label>Espèce<select id="fSpecies"></select></label>
     <label>Surnom (facultatif)<input id="fName" placeholder="ex. Le grand du salon"></label>
-    <label>Pièce<input id="fRoom" placeholder="Salon, chambre, balcon…"></label>
+    <div class="row">
+      <label style="flex:1">Emplacement<select id="fOut"><option value="0">À l'intérieur</option><option value="1">Dehors (balcon, jardin)</option></select></label>
+      <label style="flex:1">Pièce<input id="fRoom" placeholder="Salon, chambre…"></label>
+    </div>
     <div class="row">
       <label style="flex:1">Arroser tous les (jours)<input id="fEvery" type="number" inputmode="numeric" min="1" max="60"></label>
       <label style="flex:1">Dernier arrosage<input id="fLast" type="date"></label>
@@ -144,6 +167,9 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="data.js"></script>
+<script src="fiches.js"></script>
+<script src="problems.js"></script>
+<script src="saison.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
